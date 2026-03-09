@@ -3,10 +3,10 @@ import { useSearchParams } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { voucherAPI } from '../services/api';
 import { useAudio } from '../hooks/useAudio';
+import { useSocket } from '../contexts/SocketContext';
 import Button from '../components/Button';
 import Card from '../components/Card';
-import Loader from '../components/Loader';
-import { QrCode, Clock, AlertTriangle, Sparkles } from 'lucide-react';
+import { QrCode, Clock, AlertTriangle, CheckCircle, ScanLine } from 'lucide-react';
 
 export default function GenerateBarcodePage() {
   const [searchParams] = useSearchParams();
@@ -17,7 +17,9 @@ export default function GenerateBarcodePage() {
   const [error, setError] = useState('');
   const [vouchers, setVouchers] = useState([]);
   const [selectedVoucher, setSelectedVoucher] = useState(voucherId);
-  const { playSuccess, playError } = useAudio();
+  const [realtimeStatus, setRealtimeStatus] = useState(null); // 'scanned' | 'redeemed'
+  const { playSuccess, playError, playScan } = useAudio();
+  const { lastEvent, clearEvent } = useSocket();
   const intervalRef = useRef(null);
 
   useEffect(() => {
@@ -36,9 +38,27 @@ export default function GenerateBarcodePage() {
     return () => clearInterval(intervalRef.current);
   }, []);
 
+  // Listen for real-time events from business
   useEffect(() => {
-    if (timeLeft <= 0 && barcodeData) {
+    if (!lastEvent || !barcodeData) return;
+
+    if (lastEvent.voucherId === barcodeData.voucherId) {
+      if (lastEvent.type === 'scanned') {
+        setRealtimeStatus('scanned');
+        playScan();
+      } else if (lastEvent.type === 'redeemed') {
+        setRealtimeStatus('redeemed');
+        clearInterval(intervalRef.current);
+        playSuccess();
+      }
+      clearEvent();
+    }
+  }, [lastEvent]);
+
+  useEffect(() => {
+    if (timeLeft <= 0 && barcodeData && realtimeStatus !== 'redeemed') {
       setBarcodeData(null);
+      setRealtimeStatus(null);
       playError();
     }
   }, [timeLeft]);
@@ -47,6 +67,7 @@ export default function GenerateBarcodePage() {
     if (!selectedVoucher) return;
     setLoading(true);
     setError('');
+    setRealtimeStatus(null);
     try {
       const { data } = await voucherAPI.generateBarcode(selectedVoucher);
       setBarcodeData(data);
@@ -84,7 +105,47 @@ export default function GenerateBarcodePage() {
         <h1 style={{ fontSize: '24px', fontWeight: 800 }}>מימוש שובר</h1>
       </div>
 
-      {!barcodeData ? (
+      {/* REDEEMED - Success Screen */}
+      {realtimeStatus === 'redeemed' ? (
+        <div style={{ animation: 'slideUp 0.4s ease', textAlign: 'center' }}>
+          <Card style={{
+            padding: '40px 20px',
+            background: 'linear-gradient(135deg, rgba(0, 196, 140, 0.1) 0%, rgba(0, 210, 255, 0.1) 100%)',
+            border: '1px solid rgba(0, 196, 140, 0.3)',
+          }}>
+            <div style={{
+              width: '80px', height: '80px', borderRadius: '50%',
+              background: 'var(--gradient-success)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 20px', animation: 'pulse 1s ease 2',
+            }}>
+              <CheckCircle size={40} color="#fff" />
+            </div>
+            <h2 style={{ fontSize: '24px', fontWeight: 900, marginBottom: '8px' }}>
+              השובר מומש בהצלחה!
+            </h2>
+            <p style={{
+              fontSize: '36px', fontWeight: 900,
+              background: 'var(--gradient-success)',
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+              margin: '16px 0',
+            }}>
+              ₪{barcodeData?.amount}
+            </p>
+            <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
+              בית העסק אישר את המימוש
+            </p>
+          </Card>
+          <Button fullWidth onClick={() => {
+            setBarcodeData(null); setRealtimeStatus(null);
+            voucherAPI.getAll().then(({ data }) => {
+              setVouchers(data.filter(v => v.status === 'assigned'));
+            });
+          }} style={{ marginTop: '20px' }}>
+            חזרה לשוברים
+          </Button>
+        </div>
+      ) : !barcodeData ? (
         <>
           {vouchers.length > 0 ? (
             <>
@@ -112,8 +173,7 @@ export default function GenerateBarcodePage() {
                     <span style={{
                       fontSize: '24px', fontWeight: 900,
                       background: 'var(--gradient-primary)',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
+                      WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
                     }}>₪{v.amount}</span>
                   </div>
                 </Card>
@@ -141,6 +201,23 @@ export default function GenerateBarcodePage() {
         </>
       ) : (
         <div style={{ animation: 'slideUp 0.4s ease' }}>
+          {/* Scanned notification */}
+          {realtimeStatus === 'scanned' && (
+            <Card style={{
+              marginBottom: '16px',
+              background: 'rgba(0, 210, 255, 0.1)',
+              border: '1px solid rgba(0, 210, 255, 0.3)',
+              animation: 'pulse 1s ease 2',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'center' }}>
+                <ScanLine size={20} color="var(--accent)" />
+                <p style={{ color: 'var(--accent)', fontSize: '15px', fontWeight: 700 }}>
+                  הברקוד נסרק! ממתין לאישור בית העסק...
+                </p>
+              </div>
+            </Card>
+          )}
+
           {/* Timer */}
           <Card glow style={{
             textAlign: 'center',
@@ -180,29 +257,19 @@ export default function GenerateBarcodePage() {
           {timeLeft > 0 && (
             <Card style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center',
-              padding: '32px 20px',
-              background: '#fff',
-              position: 'relative',
-              overflow: 'hidden',
+              padding: '32px 20px', background: '#fff',
+              position: 'relative', overflow: 'hidden',
             }}>
-              {/* Scan line animation */}
               <div style={{
-                position: 'absolute',
-                left: '10%', right: '10%',
-                height: '2px',
-                background: 'var(--gradient-primary)',
+                position: 'absolute', left: '10%', right: '10%',
+                height: '2px', background: 'var(--gradient-primary)',
                 boxShadow: '0 0 10px rgba(108, 99, 255, 0.5)',
-                animation: 'scanLine 2s ease-in-out infinite',
-                zIndex: 1,
+                animation: 'scanLine 2s ease-in-out infinite', zIndex: 1,
               }} />
-
               <QRCodeSVG
                 value={barcodeData.barcode}
-                size={240}
-                level="H"
-                includeMargin
-                fgColor="#1A1932"
-                bgColor="#ffffff"
+                size={240} level="H" includeMargin
+                fgColor="#1A1932" bgColor="#ffffff"
               />
               <p style={{
                 marginTop: '16px', fontSize: '16px', fontWeight: 700,
@@ -216,7 +283,7 @@ export default function GenerateBarcodePage() {
             </Card>
           )}
 
-          <Button fullWidth variant="ghost" onClick={() => setBarcodeData(null)}
+          <Button fullWidth variant="ghost" onClick={() => { setBarcodeData(null); setRealtimeStatus(null); }}
             style={{ marginTop: '20px' }}>
             חזרה
           </Button>
