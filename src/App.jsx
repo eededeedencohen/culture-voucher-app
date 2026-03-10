@@ -11,6 +11,8 @@ import SettingsPage from './pages/SettingsPage';
 import MyVouchersPage from './pages/MyVouchersPage';
 import GenerateBarcodePage from './pages/GenerateBarcodePage';
 import ScannerPage from './pages/ScannerPage';
+import RedemptionHistoryPage from './pages/RedemptionHistoryPage';
+import ProfilePage from './pages/ProfilePage';
 
 function ProtectedRoute({ children, roles }) {
   const { user } = useAuth();
@@ -59,6 +61,14 @@ function AppRoutes() {
         {/* Business Routes */}
         <Route path="/scanner" element={
           <ProtectedRoute roles={['business']}><ScannerPage /></ProtectedRoute>
+        } />
+        <Route path="/history" element={
+          <ProtectedRoute roles={['business']}><RedemptionHistoryPage /></ProtectedRoute>
+        } />
+
+        {/* Profile - All Roles */}
+        <Route path="/profile" element={
+          <ProtectedRoute><ProfilePage /></ProtectedRoute>
         } />
 
         <Route path="*" element={<Navigate to={defaultRoute} />} />

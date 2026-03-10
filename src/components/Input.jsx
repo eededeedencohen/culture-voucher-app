@@ -5,9 +5,10 @@ export default function Input({ label, type = 'text', value, onChange, placehold
         <label style={{
           display: 'block',
           fontSize: '13px',
-          fontWeight: 500,
+          fontWeight: 600,
           color: 'var(--text-secondary)',
           marginBottom: '8px',
+          letterSpacing: '0.01em',
         }}>
           {label}
         </label>
@@ -22,6 +23,8 @@ export default function Input({ label, type = 'text', value, onChange, placehold
               top: '50%',
               transform: 'translateY(-50%)',
               color: 'var(--text-muted)',
+              transition: 'color var(--transition-fast)',
+              pointerEvents: 'none',
             }}
           />
         )}
@@ -32,17 +35,31 @@ export default function Input({ label, type = 'text', value, onChange, placehold
           placeholder={placeholder}
           style={{
             width: '100%',
-            padding: '14px 16px',
+            padding: '15px 16px',
             paddingRight: Icon ? '44px' : '16px',
             background: 'var(--bg-input)',
-            border: '1px solid rgba(108, 99, 255, 0.15)',
+            border: '1.5px solid rgba(108, 99, 255, 0.1)',
             borderRadius: 'var(--radius-sm)',
             color: 'var(--text-primary)',
             fontSize: '15px',
-            transition: 'border-color 0.2s',
+            fontWeight: 500,
+            transition: 'all var(--transition-base)',
+            boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.1)',
           }}
-          onFocus={(e) => e.target.style.borderColor = 'var(--primary)'}
-          onBlur={(e) => e.target.style.borderColor = 'rgba(108, 99, 255, 0.15)'}
+          onFocus={(e) => {
+            e.target.style.borderColor = 'var(--primary)';
+            e.target.style.boxShadow = 'var(--shadow-input-focus)';
+            e.target.style.background = 'var(--bg-input-focus)';
+            const icon = e.target.parentElement?.querySelector('svg');
+            if (icon) icon.style.color = 'var(--primary)';
+          }}
+          onBlur={(e) => {
+            e.target.style.borderColor = 'rgba(108, 99, 255, 0.1)';
+            e.target.style.boxShadow = 'inset 0 1px 3px rgba(0,0,0,0.1)';
+            e.target.style.background = 'var(--bg-input)';
+            const icon = e.target.parentElement?.querySelector('svg');
+            if (icon) icon.style.color = 'var(--text-muted)';
+          }}
           {...props}
         />
       </div>

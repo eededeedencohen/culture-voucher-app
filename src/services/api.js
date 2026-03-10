@@ -41,6 +41,7 @@ export const voucherAPI = {
   scan: (barcode) => api.post('/vouchers/scan', { barcode }),
   redeem: (id) => api.post(`/vouchers/${id}/redeem`),
   getStats: () => api.get('/vouchers/stats'),
+  getHistory: () => api.get('/vouchers/history'),
 };
 
 // Settings
@@ -53,6 +54,8 @@ export const settingsAPI = {
 export const userAPI = {
   getStudents: () => api.get('/users/students'),
   getBusinesses: () => api.get('/users/businesses'),
+  getStudentVouchers: (id) => api.get(`/users/students/${id}/vouchers`),
+  updateProfile: (data) => api.put('/users/profile', data),
 };
 
 export default api;
